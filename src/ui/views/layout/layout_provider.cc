@@ -6,6 +6,7 @@
 
 #include <algorithm>
 
+#include "base/command_line.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/logging.h"
 #include "ui/base/ui_base_features.h"
