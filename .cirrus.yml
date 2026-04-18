@@ -1,0 +1,84 @@
+windows_avx2_task:
+  name: Build Thorium Win AVX2
+  alias: win-avx2
+  windows_container:
+    image: cirrusci/windowsservercore:2019
+    cpu: 8
+    memory: 32G
+  use_compute_credits: true
+  timeout_in: 360m
+  env:
+    CIRRUS_SHELL: powershell
+    THOR_DIR: $CIRRUS_WORKING_DIR
+    THORIUM_SKIP_PGO_DOWNLOADS: "1"
+  prepare_environment_script: |
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+      choco install -y git
+    }
+    git config --global core.longpaths true
+    git submodule update --init --recursive
+
+    $workRoot = 'C:\cirrus\thorium-build'
+    $gclientRoot = Join-Path $workRoot 'chromium'
+    $crDir = Join-Path $gclientRoot 'src'
+    $depotTools = Join-Path $workRoot 'depot_tools'
+
+    New-Item -ItemType Directory -Force $workRoot | Out-Null
+    if (-not (Test-Path $depotTools)) {
+      git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git $depotTools
+    }
+
+    @(
+      "WORK_ROOT=$workRoot"
+      "GCLIENT_ROOT=$gclientRoot"
+      "CR_DIR=$crDir"
+      "DEPOT_TOOLS_DIR=$depotTools"
+      "PATH=$depotTools;$env:PATH"
+    ) | Add-Content $env:CIRRUS_ENV
+  bootstrap_chromium_script: |
+    $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+
+    New-Item -ItemType Directory -Force $env:GCLIENT_ROOT | Out-Null
+    Copy-Item "$env:CIRRUS_WORKING_DIR\gclient" "$env:GCLIENT_ROOT\.gclient" -Force
+
+    Push-Location $env:GCLIENT_ROOT
+    gclient sync --with_branch_heads --with_tags --nohooks --delete_unversioned_trees --jobs 8
+    Pop-Location
+  align_version_script: |
+    $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+    python3 win_scripts\version.py
+  apply_overlay_script: |
+    $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+    python3 win_scripts\setup.py --avx2
+  write_args_script: |
+    python3 win_scripts\write_gn_args.py --mode ci --variant avx2
+  generate_build_files_script: |
+    $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+    gn gen "$env:CR_DIR\out\thorium" --check
+  build_script: |
+    $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+    $env:THORIUM_MAIN_TARGETS = 'thorium'
+    $env:THORIUM_EXTRA_TARGETS = ''
+    python3 win_scripts\build_win.py '8'
+  always:
+    collect_artifacts_script: |
+      $artifactDir = Join-Path $env:CIRRUS_WORKING_DIR 'cirrus-artifacts'
+      New-Item -ItemType Directory -Force $artifactDir | Out-Null
+
+      $files = @(
+        "$env:CR_DIR\out\thorium\thorium.exe",
+        "$env:CR_DIR\out\thorium\mini_installer.exe",
+        "$env:CR_DIR\out\thorium\setup.exe",
+        "$env:CR_DIR\out\thorium\args.gn",
+        "$env:CR_DIR\out\thorium\siso_output",
+        "$env:CR_DIR\out\thorium\siso_failed_commands.bat",
+        "$env:CIRRUS_WORKING_DIR\WARN.md"
+      )
+
+      foreach ($path in $files) {
+        if (Test-Path $path) {
+          Copy-Item $path $artifactDir -Force
+        }
+      }
+    build_artifacts:
+      path: "cirrus-artifacts/**"

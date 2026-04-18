@@ -22,3 +22,15 @@ Temporary build warnings for this repo.
    runner.
    - Reason: a full Thorium/Chromium checkout plus build is too large for the
      usual small hosted runner shape.
+
+4. The experimental Cirrus CI path uses `.cirrus.yml` with a managed
+   `windows_container`, `use_compute_credits: true`, and depot_tools bootstrap
+   inside the task.
+   - Reason: Cirrus requires a repo-local `.cirrus.yml`, and the hosted Windows
+     path does not expose the same preinstalled toolchain layout as a GitHub
+     Windows runner.
+   - Proper fix later:
+     - verify that Cirrus-hosted Windows has enough disk/memory for a complete
+       Thorium build;
+     - keep this path only if it proves stable, otherwise switch the Windows CI
+       story to a dedicated self-hosted runner or a custom compute service.
