@@ -5,3 +5,6 @@
 This directory contains python files for building Thorium natively on Windows.
 
 Before running the Python files in this directory, please strictly follow the instructions in [BUILDING_WIN](https://github.com/Alex313031/thorium/blob/main/docs/BUILDING_WIN.md).
+
+`write_gn_args.py` can be used to materialize `out/thorium/args.gn` from
+`win_args.gn` without opening the interactive `gn args` editor.

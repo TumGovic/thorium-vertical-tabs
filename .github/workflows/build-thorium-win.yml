@@ -1,0 +1,182 @@
+name: Build Thorium Win
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_labels:
+        description: JSON array of labels for a larger or self-hosted Windows runner.
+        required: true
+        default: '["self-hosted","Windows","X64"]'
+      variant:
+        description: Windows build variant.
+        required: true
+        type: choice
+        default: avx2
+        options:
+          - default
+          - avx2
+      jobs:
+        description: Compile parallelism for autoninja.
+        required: true
+        default: "8"
+      build_installer:
+        description: Also build the installer target.
+        required: true
+        type: boolean
+        default: true
+      work_root:
+        description: Optional absolute path on the runner for the checkout root.
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ${{ fromJSON(inputs.runner_labels) }}
+    timeout-minutes: 360
+    env:
+      THOR_DIR: ${{ github.workspace }}
+      DEPOT_TOOLS_WIN_TOOLCHAIN: "0"
+      THORIUM_SKIP_PGO_DOWNLOADS: "1"
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Select work root
+        shell: pwsh
+        run: |
+          $requested = '${{ inputs.work_root }}'.Trim()
+          $drives = Get-PSDrive -PSProvider FileSystem | Sort-Object Free -Descending
+          if ($requested) {
+            $workRoot = $requested
+          } else {
+            $selected = $drives | Select-Object -First 1
+            $workRoot = Join-Path ("{0}:\" -f $selected.Name) 'thorium-build'
+          }
+          $qualifier = Split-Path -Qualifier $workRoot
+          $driveName = $qualifier.TrimEnd('\').TrimEnd(':')
+          $drive = Get-PSDrive -Name $driveName
+          if ($drive.Free -lt 150GB) {
+            throw "Need at least 150 GB free on the selected drive. Standard small hosted runners are not enough for full Thorium builds."
+          }
+          "WORK_ROOT=$workRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "GCLIENT_ROOT=$workRoot\chromium" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CR_DIR=$workRoot\chromium\src" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "DEPOT_TOOLS_DIR=$workRoot\depot_tools" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Show runner storage
+        shell: pwsh
+        run: Get-PSDrive -PSProvider FileSystem | Sort-Object Name | Format-Table Name,Used,Free
+
+      - name: Prepare depot_tools
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          New-Item -ItemType Directory -Force $env:WORK_ROOT | Out-Null
+          if (-not (Test-Path $env:DEPOT_TOOLS_DIR)) {
+            git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git $env:DEPOT_TOOLS_DIR
+          }
+          $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+          $env:DEPOT_TOOLS_DIR | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Bootstrap Chromium checkout
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+          New-Item -ItemType Directory -Force $env:GCLIENT_ROOT | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\gclient" "$env:GCLIENT_ROOT\.gclient" -Force
+          Push-Location $env:GCLIENT_ROOT
+          gclient sync --with_branch_heads --with_tags --nohooks --delete_unversioned_trees --jobs 8
+          Pop-Location
+
+      - name: Ensure ATL/MFC is present
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) {
+            throw "vswhere.exe not found."
+          }
+          $installPath = & $vswhere -latest -products * -property installationPath
+          if (-not $installPath) {
+            throw "Visual Studio installation path not found."
+          }
+          $atl = Get-ChildItem "$installPath\VC\Tools\MSVC\*\atlmfc\include\atldef.h" -ErrorAction SilentlyContinue
+          if ($atl) {
+            Write-Host "ATL/MFC headers already present."
+            exit 0
+          }
+          $setupExe = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
+          & $setupExe modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.ATLMFC --passive --norestart
+
+      - name: Align Chromium to Thorium version
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+          py -3 win_scripts\version.py
+
+      - name: Apply Thorium overlay
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+          $variant = '${{ inputs.variant }}'
+          if ($variant -eq 'avx2') {
+            py -3 win_scripts\setup.py --avx2
+          } else {
+            py -3 win_scripts\setup.py
+          }
+
+      - name: Write args.gn
+        shell: pwsh
+        run: py -3 win_scripts\write_gn_args.py --mode ci --variant ${{ inputs.variant }}
+
+      - name: Generate ninja files
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+          gn gen "$env:CR_DIR\out\thorium" --check
+
+      - name: Build Thorium
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:DEPOT_TOOLS_DIR;$env:PATH"
+          $env:THORIUM_MAIN_TARGETS = 'thorium'
+          if ('${{ inputs.build_installer }}' -eq 'true') {
+            $env:THORIUM_EXTRA_TARGETS = 'thorium_installer'
+          } else {
+            $env:THORIUM_EXTRA_TARGETS = 'setup'
+          }
+          py -3 win_scripts\build_win.py '${{ inputs.jobs }}'
+
+      - name: Collect artifacts
+        if: always()
+        shell: pwsh
+        run: |
+          $artifactDir = Join-Path $env:RUNNER_TEMP 'thorium-artifacts'
+          New-Item -ItemType Directory -Force $artifactDir | Out-Null
+          $files = @(
+            "$env:CR_DIR\out\thorium\thorium.exe",
+            "$env:CR_DIR\out\thorium\thorium_mini_installer.exe",
+            "$env:CR_DIR\out\thorium\mini_installer.exe",
+            "$env:CR_DIR\out\thorium\setup.exe",
+            "$env:CR_DIR\out\thorium\args.gn",
+            "$env:CR_DIR\out\thorium\siso_output",
+            "$env:CR_DIR\out\thorium\siso_failed_commands.bat",
+            "$env:GITHUB_WORKSPACE\WARN.md"
+          )
+          foreach ($path in $files) {
+            if (Test-Path $path) {
+              Copy-Item $path $artifactDir -Force
+            }
+          }
+          "ARTIFACT_DIR=$artifactDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: thorium-win-${{ inputs.variant }}-${{ github.run_number }}
+          path: ${{ env.ARTIFACT_DIR }}
+          retention-days: 7
+          if-no-files-found: error

@@ -70,6 +70,8 @@ cr_src_dir = os.getenv("CR_DIR", r"C:/src/chromium/src")
 # Set Thorium dir from Windows environment variable
 thor_src_dir = os.path.expandvars(
     os.getenv("THOR_DIR", r"%USERPROFILE%/thorium"))
+skip_pgo_downloads = os.getenv(
+    "THORIUM_SKIP_PGO_DOWNLOADS", "").lower() in ("1", "true", "yes")
 
 
 print("\nCreating build output directory...\n")
@@ -108,7 +110,6 @@ thorium_sources = [
     "src/third_party",
     "src/tools",
     "src/ui",
-    "src/v8",
 ]
 
 for source in thorium_sources:
@@ -276,17 +277,20 @@ copy(
 
 flags_to_check = ["--woa", "--avx512", "--avx2", "--sse4", "--sse3", "--sse2"]
 if not any(flag in sys.argv for flag in flags_to_check):
-    os.chdir(cr_src_dir)
-    print("\nDownloading PGO Profiles for Windows x64\n")
-    try_run(
-        "python3 tools/update_pgo_profiles.py --target=win64 "
-        "update --gs-url-base=chromium-optimization-profiles/pgo_profiles"
-    )
-    print("\nDownloading PGO Profile for V8\n")
-    try_run(
-        "python3 v8/tools/builtins-pgo/download_profiles.py "
-        "--depot-tools=third_party/depot_tools --force download"
-    )
+    if skip_pgo_downloads:
+        print("\nSkipping PGO profile downloads due to THORIUM_SKIP_PGO_DOWNLOADS\n")
+    else:
+        os.chdir(cr_src_dir)
+        print("\nDownloading PGO Profiles for Windows x64\n")
+        try_run(
+            "python3 tools/update_pgo_profiles.py --target=win64 "
+            "update --gs-url-base=chromium-optimization-profiles/pgo_profiles"
+        )
+        print("\nDownloading PGO Profile for V8\n")
+        try_run(
+            "python3 v8/tools/builtins-pgo/download_profiles.py "
+            "--depot-tools=third_party/depot_tools --force download"
+        )
 else:
     print(
         "\nFor non-AVX builds, please pass the appropriate arguments to ensure the command is executed correctly.\n"
@@ -308,6 +312,9 @@ def copy_woa():
         os.path.normpath(os.path.join(thor_src_dir, "arm", "thorium_version.txt")),
         os.path.normpath(os.path.join(cr_src_dir, "ui", "webui", "resources", "text")),
     )
+    if skip_pgo_downloads:
+        print("\nSkipping PGO profile downloads due to THORIUM_SKIP_PGO_DOWNLOADS\n")
+        return
     os.chdir(cr_src_dir)
     print("\nDownloading PGO Profiles for Windows on Arm\n")
     try_run(
@@ -342,6 +349,9 @@ def copy_avx512():
         os.path.normpath(os.path.join(thor_src_dir, "other", "AVX512", "thorium_version.txt")),
         os.path.normpath(os.path.join(cr_src_dir, "ui", "webui", "resources", "text")),
     )
+    if skip_pgo_downloads:
+        print("\nSkipping PGO profile downloads due to THORIUM_SKIP_PGO_DOWNLOADS\n")
+        return
     os.chdir(cr_src_dir)
     print("\nDownloading PGO Profiles for Windows x64\n")
     try_run(
@@ -376,6 +386,9 @@ def copy_avx2():
         os.path.normpath(os.path.join(thor_src_dir, "other", "AVX2", "thorium_version.txt")),
         os.path.normpath(os.path.join(cr_src_dir, "ui", "webui", "resources", "text")),
     )
+    if skip_pgo_downloads:
+        print("\nSkipping PGO profile downloads due to THORIUM_SKIP_PGO_DOWNLOADS\n")
+        return
     os.chdir(cr_src_dir)
     print("\nDownloading PGO Profiles for Windows x64\n")
     try_run(
@@ -405,6 +418,9 @@ def copy_sse4():
         os.path.normpath(os.path.join(thor_src_dir, "other", "SSE4.1", "thorium_version.txt")),
         os.path.normpath(os.path.join(cr_src_dir, "ui", "webui", "resources", "text")),
     )
+    if skip_pgo_downloads:
+        print("\nSkipping PGO profile downloads due to THORIUM_SKIP_PGO_DOWNLOADS\n")
+        return
     os.chdir(cr_src_dir)
     print("\nDownloading PGO Profiles for Windows x64\n")
     try_run(
@@ -434,6 +450,9 @@ def copy_sse3():
         os.path.normpath(os.path.join(thor_src_dir, "other", "SSE3", "thorium_version.txt")),
         os.path.normpath(os.path.join(cr_src_dir, "ui", "webui", "resources", "text")),
     )
+    if skip_pgo_downloads:
+        print("\nSkipping PGO profile downloads due to THORIUM_SKIP_PGO_DOWNLOADS\n")
+        return
     os.chdir(cr_src_dir)
     print("\nDownloading PGO Profiles for Windows x64\n")
     try_run(
@@ -468,6 +487,9 @@ def copy_sse2():
         os.path.normpath(os.path.join(thor_src_dir, "other", "SSE2", "thorium_version.txt")),
         os.path.normpath(os.path.join(cr_src_dir, "ui", "webui", "resources", "text")),
     )
+    if skip_pgo_downloads:
+        print("\nSkipping PGO profile downloads due to THORIUM_SKIP_PGO_DOWNLOADS\n")
+        return
     os.chdir(cr_src_dir)
     print("\nDownloading PGO Profiles for Windows x86\n")
     try_run(

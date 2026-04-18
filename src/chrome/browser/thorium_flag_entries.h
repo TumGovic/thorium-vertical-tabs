@@ -64,6 +64,10 @@
      "Thorium Rectangular Tabs UI",
      "Changes the look of browser tabs to appear with a rectangular shape, similar to Vivaldi or Cent Browser.",
      kOsDesktop, SINGLE_VALUE_TYPE("rectangular-tabs")},
+    {"vertical-tabs",
+     "Firefox-Style Vertical Tabs",
+     "Moves browser tabs into a dedicated left sidebar and hides the top horizontal tab strip.",
+     kOsDesktop, SINGLE_VALUE_TYPE("vertical-tabs")},
 
 //#if BUILDFLAG(IS_WIN)
     //{"transparent-tabs",

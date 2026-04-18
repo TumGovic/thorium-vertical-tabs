@@ -30,7 +30,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "build/build_config.h"
-#include "chrome/browser/unexpire_flags.h"
 #include "components/variations/field_trial_config/field_trial_util.h"
 #include "components/variations/variations_associated_data.h"
 #include "components/variations/variations_switches.h"
@@ -44,6 +43,15 @@
 #if BUILDFLAG(IS_ANDROID)
 #include "components/cached_flags/android/jni_delegate_impl.h"
 #endif
+
+namespace flags_ui {
+class FlagsStorage;
+}  // namespace flags_ui
+
+namespace flags {
+bool IsFlagExpired(const flags_ui::FlagsStorage* storage,
+                   const char* internal_name);
+}  // namespace flags
 
 namespace flags_ui {
 

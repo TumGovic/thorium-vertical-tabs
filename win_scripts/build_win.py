@@ -33,6 +33,8 @@ if '--help' in sys.argv:
 
 # Set chromium/src dir from Windows environment variable
 cr_src_dir = os.getenv('CR_DIR', r'C:/src/chromium/src')
+main_targets = os.getenv('THORIUM_MAIN_TARGETS', 'thorium_all').split()
+extra_targets = os.getenv('THORIUM_EXTRA_TARGETS', 'thorium_installer').split()
 
 print("\nBuilding Thorium for Windows\n")
 
@@ -41,9 +43,11 @@ os.chdir(cr_src_dir)
 # Determine the number of threads to use
 jobs = sys.argv[1] if len(sys.argv) > 1 else str(os.cpu_count())
 
-try_run(f'autoninja -C out/thorium thorium_all -j{jobs}')
+if main_targets:
+    try_run(f'autoninja -C out/thorium {" ".join(main_targets)} -j{jobs}')
 
-try_run(f'autoninja -C out/thorium setup mini_installer -j{jobs}')
+if extra_targets:
+    try_run(f'autoninja -C out/thorium {" ".join(extra_targets)} -j{jobs}')
 
 installer_dest = os.path.normpath(os.path.join(cr_src_dir, 'out', 'thorium'))
 

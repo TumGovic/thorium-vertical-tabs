@@ -7,3 +7,5 @@ __I've also made some pages on the thorium.rocks website relating to Thorium dev
  - There is a developer page [Here](https://thorium.rocks/dev), with links to different tools developers would find useful.
  - There is also the [documentation page](https://thorium.rocks/docs/), which has html copies of things in here as well as some things not in here. Recommended to use these instead.
  - *NOTE:* The .txt instructions are old, and only included for posterity, please use the .md instructions.
+ - For native Firefox-style tabs work, see [VERTICAL_TABS.md](./VERTICAL_TABS.md).
+ - For the remote Windows CI build path, see [GITHUB_ACTIONS_WIN.md](./GITHUB_ACTIONS_WIN.md).
