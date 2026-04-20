@@ -17,6 +17,7 @@
 #include "ui/color/color_id.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/controls/button/label_button.h"
@@ -31,6 +32,8 @@ constexpr int kRowMinHeight = 38;
 constexpr int kNewTabButtonHeight = 40;
 
 class VerticalTabRowView : public views::View {
+  METADATA_HEADER(VerticalTabRowView, views::View)
+
  public:
   VerticalTabRowView(std::u16string title,
                      std::u16string tooltip,
@@ -92,6 +95,9 @@ class VerticalTabRowView : public views::View {
   raw_ptr<views::LabelButton> title_button_ = nullptr;
   raw_ptr<views::LabelButton> close_button_ = nullptr;
 };
+
+BEGIN_METADATA(VerticalTabRowView)
+END_METADATA
 
 std::u16string GetFallbackTitle(content::WebContents* contents) {
   if (!contents) {
@@ -293,3 +299,6 @@ void VerticalTabStripContainerView::UpdateContainerStyling() {
     new_tab_button_->SetEnabledTextColors(ui::kColorSysOnSurface);
   }
 }
+
+BEGIN_METADATA(VerticalTabStripContainerView)
+END_METADATA

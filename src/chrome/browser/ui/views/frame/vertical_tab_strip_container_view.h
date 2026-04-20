@@ -7,6 +7,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/view.h"
 
 class Browser;
@@ -23,6 +24,8 @@ class ScrollView;
 
 class VerticalTabStripContainerView : public views::View,
                                       public TabStripModelObserver {
+  METADATA_HEADER(VerticalTabStripContainerView, views::View)
+
  public:
   static constexpr int kPreferredWidth = 264;
 
